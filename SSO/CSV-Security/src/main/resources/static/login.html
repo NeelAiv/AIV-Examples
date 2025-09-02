@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AIV CSV Login</title>
+</head>
+<body>
+<div class="login-container">
+    <h1>AIV CSV Authentication</h1>
+    <form action="/aiv/login-handler" method="POST">
+        <input type="text" id="username" name="username" placeholder="department::username" required>
+        <input type="password" id="password" name="password" required>
+
+        <button type="submit">Log In</button>
+    </form>
+    <div id="error-message"></div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('error')) {
+            document.getElementById('error-message').textContent = 'Invalid username or password.';
+        }
+    });
+</script>
+</body>
+</html>

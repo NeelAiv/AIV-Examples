@@ -1,0 +1,3 @@
+id,name,description,email,dashboardOption,alertsOption,reportOption,mergeReportOption,adhocOption,resourceOption,quickRunOption,mappingOption,messageOption,datasetOption,parameterOption,annotationOption,notificationOption,requestOption,adminOption,scheduleOption,webhookOption,department
+1,Administrator,Full access role,admin@aivhub.com,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,Default
+2,Viewer,Read-only access,viewer@aivhub.com,1,1,1,0,0,1,0,0,1,0,0,1,1,0,0,0,0,Default
