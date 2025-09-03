@@ -1,3 +1,7 @@
 id,userName,roleName
 1,Admin,Administrator
-2,Demo,Viewer
+2,Sclark,Data Analyst
+3,Sclark,Report Publisher
+4,Jdoe,Content Editor
+5,Jdoe,Viewer
+6,Jsmith,Viewer

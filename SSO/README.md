@@ -13,7 +13,7 @@ This application is a robust and customizable security solution for Spring Boot 
 
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
+These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. You will use the Spring Initializr to generate a new Spring Boot project and then add the necessary dependencies.
 
 ## Prerequisites
 
@@ -23,34 +23,31 @@ Before you begin, ensure you have the following installed:
 - **Maven 3.2 or higher**
 - **PostgreSQL database**
 
+## Create Project with Spring Initializr
+
+1.  Navigate to [start.spring.io](https://start.spring.io).
+2.  Select your project's build tool: **Maven**.
+3.  Choose **Java** as the language.
+4.  Select a stable version of **Spring Boot**.
+5.  Fill in the **Project Metadata**:
+    *   **Group:** A package name for your application (e.g., `com.example`).
+    *   **Artifact:** The name of your application (e.g., `security-app`).
+    *   **Name:** A descriptive name for your project.
+6. In the **Dependencies** section, add the following as a starting point. You should add or remove dependencies according to your specific project needs.
+    *   **Spring Web:** For building web applications.
+    *   **Spring Security:** For authentication and access-control.
+    *   **Spring Data JPA:** To persist data in SQL stores with Java Persistence API using Spring Data and Hibernate.
+    *   **PostgreSQL Driver:** A JDBC and R2DBC driver for the PostgreSQL database.
+7.  Click the **Generate** button to download a ZIP file containing your project.
+8.  Unzip the downloaded file to a location on your machine.
+
 ### Required JARs
 
-Download the required JAR files from our repository:
+Download the required JAR files from our repository and add in your project:
 [Additional JARs](https://github.com/aiv-code/docker-aiv/tree/main/config/Additional%20Jars)
 
 These JARs contain essential dependencies for the security framework and should be added to your Maven local repository or classpath before building the project.
 
-## Building the Project
-
-1.  **Clone the repository:**
-
-    ```bash
-    git clone <repository-url>
-    ```
-
-2.  **Navigate to the project directory:**
-
-    ```bash
-    cd aiaivsecurity
-    ```
-
-3.  **Build the project using Maven:**
-
-    ```bash
-    mvn clean install -Dmaven.repo.local=D:\Parth\maven\.m2\repository
-    ```
-
-    This command will build the project and create a JAR file in the `target` directory.
 
 ### Running the Application
 

@@ -52,15 +52,14 @@ public class CsvAuthFilter implements Filter {
             return;
         }
 
-        // For all other requests (like /aiv/Default/sso_login?e=...), let them pass through.
         chain.doFilter(request, response);
     }
 
     private void handleTokenExtensionForSpecialUrls(HttpServletRequest req, HttpServletResponse res, String uri) {
         if (shouldExtendTokenForUri(uri)) {
-            String oldToken = req.getHeader("X-XSRFTOKEN");
+            String oldToken = req.getHeader("token");
             if (oldToken == null) {
-                oldToken = req.getParameter("X-XSRFTOKEN");
+                oldToken = req.getParameter("token");
             }
 
             if (oldToken != null && !oldToken.trim().isEmpty()) {
@@ -71,7 +70,7 @@ public class CsvAuthFilter implements Filter {
 
                     String extendedToken = jwtTokenUtil.extendTokenExpiration(oldToken, sessionTimeInSeconds);
 
-                    res.addHeader("auth-token", extendedToken);
+                    res.addHeader("token", extendedToken);
                 } catch (Exception e) {
                     System.err.println("ERROR: Failed to extend token for URL " + uri + ": " + e.getMessage());
                     try {
@@ -103,7 +102,6 @@ public class CsvAuthFilter implements Filter {
     }
 
     private boolean isExcluded(String uri) {
-        // Also check for static resources like CSS, JS if you add them later.
         if (uri.startsWith("/aiv/") && (uri.endsWith(".css") || uri.endsWith(".js") || uri.endsWith(".html"))) {
             // A simple check to see if it's trying to access the login page itself.
             return uri.equals("/aiv/login.html");

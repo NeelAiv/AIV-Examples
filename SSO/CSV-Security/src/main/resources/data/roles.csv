@@ -1,3 +1,6 @@
 id,name,description,email,dashboardOption,alertsOption,reportOption,mergeReportOption,adhocOption,resourceOption,quickRunOption,mappingOption,messageOption,datasetOption,parameterOption,annotationOption,notificationOption,requestOption,adminOption,scheduleOption,webhookOption,department
 1,Administrator,Full access role,admin@aivhub.com,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,Default
-2,Viewer,Read-only access,viewer@aivhub.com,1,1,1,0,0,1,0,0,1,0,0,1,1,0,0,0,0,Default
+2,Data Analyst,"Can create and edit reports, dashboards, and datasets",admin@aivhub.com,2,1,2,1,2,1,1,1,1,2,2,1,1,1,0,2,1,Default
+3,Content Editor,"Can create and edit reports and dashboards, but not datasets",admin@aivhub.com,2,1,2,1,1,1,1,0,1,0,1,1,1,1,0,1,0,Default
+4,Report Publisher,"Can schedule and publish reports created by others",admin@aivhub.com,1,1,1,0,0,1,0,0,1,0,0,1,1,0,0,2,0,Default
+5,Viewer,"Read-only access to view dashboards and reports",admin@aivhub.com,1,0,1,0,0,1,0,0,1,0,0,1,1,0,0,0,0,Default

@@ -1,3 +1,6 @@
 id,firstName,lastName,userName,status,password,email,homeFolder,backupUserId,managerUserId,dashboardOption,alertsOption,reportOption,mergeReportOption,adhocOption,resourceOption,quickRunOption,mappingOption,messageOption,datasetOption,parameterOption,annotationOption,notificationOption,requestOption,adminOption,scheduleOption,webhookOption,userType,default_dashboard,landing_page,locale,timezone,theme,notification,department,showname,showimage
 1,Admin,User,Admin,Active,password,admin@aivhub.com,/Admin,,,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,INT,,Documents/Reports,en,SYSTEM,Default,0,Default,1,1
-2,Demo,User,Demo,Active,demopass,demo@aivhub.com,/demo,,,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,2,0,INT,,Documents/Reports,en,SYSTEM,Default,0,Default,1,1
+2,Sarah,Clark,Sclark,Active,sclarkpass,s.clark@aivhub.com,/sclark,,,1,1,2,1,2,1,1,0,1,2,1,1,1,1,0,1,0,INT,,Documents/Reports,en,SYSTEM,Default,0,Default,1,1
+3,John,Doe,Jdoe,Inactive,jdoepass,j.doe@aivhub.com,/jdoe,,,1,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,0,INT,,Documents/Reports,en,SYSTEM,Default,0,Default,1,1
+4,Jane,Smith,Jsmith,Inactive,jsmithpass,j.smith@aivhub.com,/jsmith,,,1,0,1,0,0,1,0,0,1,0,0,1,1,0,0,0,0,INT,,Documents/Reports,en,SYSTEM,Default,0,Default,1,1
+5,Guest,User,Guest,Inactive,guestpass,guest@aivhub.com,/guest,,,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,INT,,Documents/Reports,en,SYSTEM,Default,0,Default,1,1

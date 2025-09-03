@@ -13,11 +13,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Controller
 public class AuthController {
@@ -61,99 +58,23 @@ public class AuthController {
 
         if (userDetails != null) {
             String canonicalUsername = userDetails.get("userName").toString();
-
-            String salt = "Activeintelligence";
             String token = jwtTokenUtil.generateToken(parsedUsername, "-1");
 
             Map<String, Object> ssoPayloadObject = new HashMap<>();
 
-
             ssoPayloadObject.put("owner", canonicalUsername);
             ssoPayloadObject.put("traceid", UUID.randomUUID().toString());
-            ssoPayloadObject.put("password", password);
-            ssoPayloadObject.put("salt", salt);
             ssoPayloadObject.put("userName", canonicalUsername);
             ssoPayloadObject.put("token", token);
-            ssoPayloadObject.put("auth-token", token);
-            ssoPayloadObject.put("archiveMode", false);
-            ssoPayloadObject.put("additional_token", new HashMap<>());
-            ssoPayloadObject.put("deptCode", deptCode);
             ssoPayloadObject.put("dc", deptCode);
-            ssoPayloadObject.put("additionalHeaders", new HashMap<>());
-            ssoPayloadObject.put("username", canonicalUsername);
-
 
             HeaderSecurity headerSecurity = new HeaderSecurity();
-            String hexPayload = headerSecurity.getSecure(ssoPayloadObject, deptCode, UUID.randomUUID().toString());
-
-            String finalRedirectUrl = getString(request, deptCode, hexPayload);
+            String finalRedirectUrl = headerSecurity.getSecure(ssoPayloadObject, deptCode, request, null, UUID.randomUUID().toString());
 
             return "redirect:" + finalRedirectUrl;
 
         } else {
             return "redirect:" + request.getContextPath() + "/login?error=true";
-        }
-    }
-
-    private static String getString(HttpServletRequest request, String deptCode, String hexPayload) {
-        String scheme = request.getScheme();
-        String serverName = request.getServerName();
-        int serverPort = request.getServerPort();
-        String contextPath = request.getContextPath();
-
-        return String.format("%s://%s:%d%s/%s/sso_login?e=%s",
-                scheme,
-                serverName,
-                serverPort,
-                contextPath,
-                deptCode,
-                hexPayload
-        );
-    }
-
-    @PostMapping("/authenticate")
-    @ResponseBody
-    public ResponseEntity<String> authenticateApi(@RequestBody Map<String, Object> credentials) throws Exception {
-        IAuthentication authentication = CsvAuthenticationImpl.getInstance();
-        if (authentication == null) {
-            return ResponseEntity.status(500).body("Authentication service not initialized.");
-        }
-
-        String traceId = UUID.randomUUID().toString();
-        String deptCode = (String) credentials.get("deptCode");
-        String userName = (String) credentials.get("userName");
-        String password = (String) credentials.get("password");
-
-        Map<String, Object> userDetails = authentication.authenticate(credentials);
-
-        if (userDetails != null) {
-            String canonicalUsername = userDetails.get("userName").toString();
-            String salt = "Activeintelligence";
-            String token = jwtTokenUtil.generateToken(canonicalUsername, "-1");
-
-            Map<String, Object> ssoPayload = new HashMap<>();
-            ssoPayload.put("owner", canonicalUsername);
-            ssoPayload.put("traceid", UUID.randomUUID().toString());
-            ssoPayload.put("salt", salt);
-            ssoPayload.put("isAdmin", canonicalUsername.equalsIgnoreCase("admin"));
-            ssoPayload.put("userName", canonicalUsername);
-            ssoPayload.put("additional_token", new HashMap<>());
-            ssoPayload.put("archiveMode", false);
-            ssoPayload.put("token", token);
-            ssoPayload.put("isDatasource", true);
-            ssoPayload.put("password", password);
-            ssoPayload.put("deptCode", deptCode);
-            ssoPayload.put("auth-token", token);
-            ssoPayload.put("username", canonicalUsername);
-            ssoPayload.put("additionalHeaders", new HashMap<>());
-            ssoPayload.put("dc", deptCode);
-
-            HeaderSecurity headerSecurity = new HeaderSecurity();
-            String securePayload = headerSecurity.getSecure(ssoPayload, deptCode, UUID.randomUUID().toString());
-
-            return ResponseEntity.ok(securePayload);
-        } else {
-            return ResponseEntity.status(401).body("Invalid Authentication");
         }
     }
 

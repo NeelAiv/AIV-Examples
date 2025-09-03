@@ -3,19 +3,20 @@ package com.example.CSV.Security.security;
 import com.aivhub.logs.AuditLoggerUtil;
 import com.aivhub.security.IAuthentication;
 import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
 import com.opencsv.exceptions.CsvException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
@@ -34,11 +35,12 @@ public class CsvAuthenticationImpl implements IAuthentication {
 
     private final JwtTokenUtil jwtTokenUtil = new JwtTokenUtil();
 
-    private ResourceLoader resourceLoader;
-    private String usersFilePath;
-    private String rolesFilePath;
-    private String userRolesFilePath;
-    private String userDefaultsPath;
+    private static ResourceLoader resourceLoader;
+
+    private static String usersFilePath;
+    private static String rolesFilePath;
+    private static String userRolesFilePath;
+    private static String userDefaultsPath;
 
     private static List<Map<String, String>> users;
     private static List<Map<String, String>> roles;
@@ -54,13 +56,13 @@ public class CsvAuthenticationImpl implements IAuthentication {
 
     @Override
     public void setApplicationContextAndDatasource(ApplicationContext context) {
-        this.resourceLoader = context;
+        CsvAuthenticationImpl.resourceLoader = context;
         Environment environment = context.getEnvironment();
 
-        this.usersFilePath = environment.getProperty("sso.csv.users-file");
-        this.rolesFilePath = environment.getProperty("sso.csv.roles-file");
-        this.userRolesFilePath = environment.getProperty("sso.csv.user-roles-file");
-        this.userDefaultsPath = environment.getProperty("sso.user-defaults-path");
+        CsvAuthenticationImpl.usersFilePath = environment.getProperty("sso.csv.users-file");
+        CsvAuthenticationImpl.rolesFilePath = environment.getProperty("sso.csv.roles-file");
+        CsvAuthenticationImpl.userRolesFilePath = environment.getProperty("sso.csv.user-roles-file");
+        CsvAuthenticationImpl.userDefaultsPath = environment.getProperty("sso.user-defaults-path");
 
         this.loadDataFromCsv();
 
@@ -68,10 +70,10 @@ public class CsvAuthenticationImpl implements IAuthentication {
     }
 
     private void loadDataFromCsv() {
-        CsvAuthenticationImpl.users = loadCsvFile(this.usersFilePath);
-        CsvAuthenticationImpl.roles = loadCsvFile(this.rolesFilePath);
-        CsvAuthenticationImpl.userRoles = loadCsvFile(this.userRolesFilePath);
-        CsvAuthenticationImpl.userDefaults = loadPropertiesFile(this.userDefaultsPath);
+        CsvAuthenticationImpl.users = loadCsvFile(CsvAuthenticationImpl.usersFilePath);
+        CsvAuthenticationImpl.roles = loadCsvFile(CsvAuthenticationImpl.rolesFilePath);
+        CsvAuthenticationImpl.userRoles = loadCsvFile(CsvAuthenticationImpl.userRolesFilePath);
+        CsvAuthenticationImpl.userDefaults = loadPropertiesFile(CsvAuthenticationImpl.userDefaultsPath);
         AuditLoggerUtil.log(AuditLoggerUtil.SECURITYLOGGER, AuditLoggerUtil.INFO, "CsvAuthenticationImpl", "CSV data loaded successfully.", traceid, deptCode, null);
     }
 
@@ -111,7 +113,7 @@ public class CsvAuthenticationImpl implements IAuthentication {
     }
 
     @Override
-    public Map<String, Object> embedAuthenticate(HttpServletRequest req, HttpServletResponse res, Map<String, Object> data) {
+    public Map<String, Object> embedAuthenticate(jakarta.servlet.http.HttpServletRequest req, jakarta.servlet.http.HttpServletResponse res, Map<String, Object> data) {
         try {
             String deptCode = data.containsKey("deptCode") ? data.get("deptCode").toString() : null;
             String uname = data.containsKey("userName") ? data.get("userName").toString() : null;
@@ -317,19 +319,25 @@ public class CsvAuthenticationImpl implements IAuthentication {
     public List<Map<String, Object>> getAlldepartmentsWithAdmin(String owner, String deptCode) {
         lock.readLock().lock();
         try {
-            if (users == null || userRoles == null) {
+            if (users == null || userRoles == null || roles == null) {
                 return Collections.emptyList();
             }
+
+            Set<String> adminRoleNames = roles.stream()
+                    .filter(r -> "2".equals(r.get("adminOption")))
+                    .map(r -> r.get("name"))
+                    .collect(Collectors.toSet());
+
+            Set<String> adminUserNames = userRoles.stream()
+                    .filter(ur -> adminRoleNames.contains(ur.get("roleName")))
+                    .map(ur -> ur.get("userName"))
+                    .collect(Collectors.toSet());
+
             List<String> departmentNames = users.stream()
                     .map(u -> u.get("department"))
                     .filter(d -> d != null && !d.trim().isEmpty())
                     .distinct()
                     .collect(Collectors.toList());
-
-            Set<String> adminUserNames = userRoles.stream()
-                    .filter(ur -> "Administrator".equalsIgnoreCase(ur.get("roleName")))
-                    .map(ur -> ur.get("userName"))
-                    .collect(Collectors.toSet());
 
             return departmentNames.stream()
                     .map(deptName -> {
@@ -344,8 +352,12 @@ public class CsvAuthenticationImpl implements IAuthentication {
                         if (adminUserRecordOpt.isPresent()) {
                             result.putAll(adminUserRecordOpt.get());
                         } else {
-                            result.put("userName", "");
+                            users.stream()
+                                    .filter(u -> deptName.equalsIgnoreCase(u.get("department")))
+                                    .findFirst()
+                                    .ifPresent(u -> result.put("userName", u.get("userName")));
                         }
+                        result.putIfAbsent("userName", "");
                         return result;
                     })
                     .collect(Collectors.toList());
@@ -356,7 +368,48 @@ public class CsvAuthenticationImpl implements IAuthentication {
 
     @Override
     public int CreateEditUser(Map<String, Object> data, String deptCode) {
-        return -1;
+        String userName = (String) data.get("userName");
+        if (userName == null || userName.trim().isEmpty()) {
+            AuditLoggerUtil.log(AuditLoggerUtil.SECURITYLOGGER, AuditLoggerUtil.ERROR, "CsvAuthenticationImpl", "CreateEditUser failed: userName is missing.", traceid, deptCode, null);
+            return -1;
+        }
+
+        lock.writeLock().lock();
+        try {
+            Optional<Map<String, String>> existingUser = users.stream()
+                    .filter(u -> u.get("userName").equalsIgnoreCase(userName) && u.get("department").equalsIgnoreCase(deptCode))
+                    .findFirst();
+
+            if (existingUser.isPresent()) {
+                Map<String, String> userToUpdate = existingUser.get();
+                data.forEach((key, value) -> {
+                    if (value != null) {
+                        userToUpdate.put(key, String.valueOf(value));
+                    }
+                });
+            } else {
+                Map<String, String> newUser = new HashMap<>();
+                data.forEach((key, value) -> {
+                    if (value != null) {
+                        newUser.put(key, String.valueOf(value));
+                    }
+                });
+                newUser.putIfAbsent("department", deptCode);
+                users.add(newUser);
+            }
+
+            if (writeCsvFile(users, CsvAuthenticationImpl.usersFilePath)) {
+                return 1;
+            } else {
+                System.err.println("Failed to write changes to users.csv");
+                return -1;
+            }
+        } catch (Exception e) {
+            AuditLoggerUtil.log(AuditLoggerUtil.SECURITYLOGGER, AuditLoggerUtil.ERROR, "CsvAuthenticationImpl", "Exception in CreateEditUser for user: " + userName, traceid, deptCode, e);
+            return -1;
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
     @Override
@@ -364,7 +417,8 @@ public class CsvAuthenticationImpl implements IAuthentication {
         lock.readLock().lock();
         try {
             if (users == null) return false;
-            return users.stream().anyMatch(u -> u.get("userName").equalsIgnoreCase(name) && u.get("department").equalsIgnoreCase(deptCode));
+            boolean isUexists = users.stream().anyMatch(u -> u.get("userName").equalsIgnoreCase(name) && u.get("department").equalsIgnoreCase(deptCode));
+            return isUexists;
         } finally {
             lock.readLock().unlock();
         }
@@ -373,40 +427,44 @@ public class CsvAuthenticationImpl implements IAuthentication {
     @Override
     public List<Map<String, Object>> getAllUsers(String deptCode, Map<String, Object> map) {
         if (users == null) return Collections.emptyList();
-        return users.stream().<Map<String, Object>>map(HashMap::new).collect(Collectors.toList());
+        List<Map<String, Object>> allUsers = users.stream().<Map<String, Object>>map(HashMap::new).collect(Collectors.toList());
+        return allUsers;
     }
 
     @Override
     public List<Map<String, Object>> getAllRoles(String deptCode, Map<String, Object> map) {
         if (roles == null) return Collections.emptyList();
-        return roles.stream().<Map<String, Object>>map(HashMap::new).collect(Collectors.toList());
+        List<Map<String, Object>> allRoles = roles.stream().<Map<String, Object>>map(HashMap::new).collect(Collectors.toList());
+        return allRoles;
     }
 
     @Override
     public Map<String, Object> getUserByName(String userName, String deptCode, Map<String, Object> map) {
         if (users == null) return null;
-        return users.stream()
+        Map<String, Object> getUserByName = users.stream()
                 .filter(u -> u.get("userName").equalsIgnoreCase(userName) && u.get("department").equalsIgnoreCase(deptCode))
                 .findFirst()
                 .<Map<String, Object>>map(HashMap::new)
                 .orElse(null);
+        return getUserByName;
     }
 
     @Override
     public Map<String, Object> getRoleByName(String roleName, String deptCode, Map<String, Object> map) {
         if (roles == null) return null;
-        return roles.stream()
+        Map<String, Object> getRoleByName = roles.stream()
                 .filter(r -> r.get("name").equalsIgnoreCase(roleName) && r.get("department").equalsIgnoreCase(deptCode))
                 .findFirst()
                 .<Map<String, Object>>map(HashMap::new)
                 .orElse(null);
+        return getRoleByName;
     }
 
     @Override
     public boolean isAuthorize(Map<String, Object> headers) {
         try {
 
-            String token = (String) headers.get("x-xsrftoken");
+            String token = (String) headers.get("token");
 
             if (token == null || token.trim().isEmpty()) {
                 token = (String) headers.get("token");
@@ -448,18 +506,348 @@ public class CsvAuthenticationImpl implements IAuthentication {
         }
     }
 
-    @Override public void setSource(DataSource dataSource, String deptCode, String traceid) { this.deptCode = deptCode; this.traceid = traceid; }
-    @Override public int changePassword(Map<String, Object> user, String deptCode, String traceid) { return -1; }
-    @Override public List<Map<String, Object>> selectUsersOfRole(String role, String deptCode) { return new ArrayList<>(); }
-    @Override public List<Map<String, Object>> selectRolesOfUser(String user, String deptCode) { return new ArrayList<>(); }
-    @Override public boolean isRoleExists(String name, String deptCode) { if (roles == null) return false; return roles.stream().anyMatch(r -> r.get("name").equalsIgnoreCase(name)); }
-    @Override public int CreateEditRole(Map<String, Object> data, String deptCode) { return -1; }
-    @Override public int CreateEditDepartment(Map<String, Object> data, String deptCode) { return -1; }
-    @Override public int deleteDeptById(String owner, Map<String, Object> deptId) { return -1; }
-    @Override public int deleteUserById(String userName, String deptCode) { return -1; }
-    @Override public int deleteRoleById(String roleName, String deptCode) { return -1; }
-    @Override public int updateRolesForUser(Map<String, Object> userRoleData, String updatedBy, String deptCode, String traceid) { return -1; }
-    @Override public int updateUsersForRole(Map<String, Object> userRoleData, String updatedBy, String deptCode, String traceid) { return -1; }
-    @Override public boolean deptExists(String deptCode, String traceid) { return true; }
-    @Override public String generateEmbedToken(Map<String, Object> data, String deptCode, String traceid) { return "dummy-token"; }
+    @Override
+    public void setSource(DataSource dataSource, String deptCode, String traceid) {
+        this.deptCode = deptCode;
+        this.traceid = traceid;
+    }
+
+    @Override
+    public int changePassword(Map<String, Object> user, String deptCode, String traceid) {
+        String userName = (String) user.get("userName");
+        String oldPassword = (String) user.get("oldPassword");
+        String newPassword = (String) user.get("newPassword");
+
+        lock.writeLock().lock();
+        try {
+            Optional<Map<String, String>> userToUpdate = users.stream()
+                    .filter(u -> u.get("userName").equalsIgnoreCase(userName) && u.get("department").equalsIgnoreCase(deptCode))
+                    .findFirst();
+
+            if (userToUpdate.isPresent()) {
+                Map<String, String> foundUser = userToUpdate.get();
+                if (foundUser.get("password").equals(oldPassword)) {
+                    foundUser.put("password", newPassword);
+                    if (writeCsvFile(users, CsvAuthenticationImpl.usersFilePath)) {
+                        return 1;
+                    } else {
+                        return -1;
+                    }
+                } else {
+                    return -2;
+                }
+            }
+            return -3;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public List<Map<String, Object>> selectUsersOfRole(String roleName, String deptCode) {
+        lock.readLock().lock();
+        try {
+            if (userRoles == null || users == null) {
+                return Collections.emptyList();
+            }
+
+            Set<String> userNamesInRole = userRoles.stream()
+                    .filter(ur -> ur.get("roleName").equalsIgnoreCase(roleName))
+                    .map(ur -> ur.get("userName"))
+                    .collect(Collectors.toSet());
+
+            if (userNamesInRole.isEmpty()) return new ArrayList<>();
+
+            List<Map<String, Object>> selectUsersOfRole = users.stream()
+                    .filter(u -> userNamesInRole.contains(u.get("userName")) && u.get("department").equalsIgnoreCase(deptCode))
+                    .map(u -> new HashMap<String, Object>(u))
+                    .collect(Collectors.toList());
+
+            return selectUsersOfRole;
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    @Override
+    public List<Map<String, Object>> selectRolesOfUser(String userName, String deptCode) {
+        lock.readLock().lock();
+        try {
+            if (userRoles == null || roles == null) {
+                return Collections.emptyList();
+            }
+
+            Set<String> roleNamesForUser = userRoles.stream()
+                    .filter(ur -> ur.get("userName").equalsIgnoreCase(userName))
+                    .map(ur -> ur.get("roleName"))
+                    .collect(Collectors.toSet());
+
+            if (roleNamesForUser.isEmpty()) return new ArrayList<>();
+
+            List<Map<String, Object>> selectRolesOfUser = roles.stream()
+                    .filter(r -> roleNamesForUser.contains(r.get("name")) && r.get("department").equalsIgnoreCase(deptCode))
+                    .map(r -> new HashMap<String, Object>(r))
+                    .collect(Collectors.toList());
+
+            return selectRolesOfUser;
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    @Override
+    public boolean isRoleExists(String name, String deptCode) {
+        if (roles == null) return false;
+        lock.readLock().lock();
+        try {
+            return roles.stream().anyMatch(r -> r.get("name").equalsIgnoreCase(name) && r.get("department").equalsIgnoreCase(deptCode));
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    @Override
+    public int CreateEditRole(Map<String, Object> data, String deptCode) {
+        String roleName = (String) data.get("name");
+        if (roleName == null || roleName.trim().isEmpty()) {
+            return -1;
+        }
+
+        lock.writeLock().lock();
+        try {
+            Optional<Map<String, String>> existingRole = roles.stream()
+                    .filter(r -> r.get("name").equalsIgnoreCase(roleName) && r.get("department").equalsIgnoreCase(deptCode))
+                    .findFirst();
+
+            if (existingRole.isPresent()) {
+                Map<String, String> roleToUpdate = existingRole.get();
+                data.forEach((key, value) -> roleToUpdate.put(key, String.valueOf(value)));
+            } else {
+                Map<String, String> newRole = new HashMap<>();
+                data.forEach((key, value) -> newRole.put(key, String.valueOf(value)));
+                newRole.putIfAbsent("department", deptCode);
+                roles.add(newRole);
+            }
+
+            if (writeCsvFile(roles, CsvAuthenticationImpl.rolesFilePath)) {
+                return 1;
+            } else {
+                return -1;
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    private boolean writeCsvFile(List<Map<String, String>> data, String resourcePath) {
+        if (data.isEmpty()) {
+            return false;
+        }
+        try {
+            Resource resource = resourceLoader.getResource(resourcePath);
+            File file = resource.getFile();
+
+            try (CSVWriter writer = new CSVWriter(new FileWriter(file))) {
+                String[] header = data.get(0).keySet().toArray(new String[0]);
+                writer.writeNext(header);
+
+                for (Map<String, String> row : data) {
+                    String[] values = new String[header.length];
+                    for (int i = 0; i < header.length; i++) {
+                        values[i] = row.get(header[i]);
+                    }
+                    writer.writeNext(values);
+                }
+            }
+            return true;
+        } catch (IOException e) {
+            AuditLoggerUtil.log(AuditLoggerUtil.SECURITYLOGGER, AuditLoggerUtil.ERROR, "CsvAuthenticationImpl", "Failed to write to CSV resource: " + resourcePath, traceid, deptCode, e);
+            return false;
+        }
+    }
+
+    @Override
+    public int CreateEditDepartment(Map<String, Object> data, String deptCode) {
+        String oldDeptCode = (String) data.get("oldDeptCode");
+        String newDeptCode = (String) data.get("newDeptCode");
+
+        if (oldDeptCode == null || newDeptCode == null || oldDeptCode.trim().isEmpty() || newDeptCode.trim().isEmpty()) {
+            return -1;
+        }
+
+        lock.writeLock().lock();
+        try {
+            AtomicBoolean changed = new AtomicBoolean(false);
+
+            users.stream()
+                    .filter(u -> u.get("department").equalsIgnoreCase(oldDeptCode))
+                    .forEach(u -> {
+                        u.put("department", newDeptCode);
+                        changed.set(true);
+                    });
+
+            roles.stream()
+                    .filter(r -> r.get("department").equalsIgnoreCase(oldDeptCode))
+                    .forEach(r -> {
+                        r.put("department", newDeptCode);
+                        changed.set(true);
+                    });
+
+            if (changed.get()) {
+                boolean usersWritten = writeCsvFile(users, CsvAuthenticationImpl.usersFilePath);
+                boolean rolesWritten = writeCsvFile(roles, CsvAuthenticationImpl.rolesFilePath);
+                return (usersWritten && rolesWritten) ? 1 : -1;
+            }
+            return 1;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public int deleteDeptById(String owner, Map<String, Object> deptId) {
+        String deptToDelete = (String) deptId.get("deptCode");
+        if (deptToDelete == null || deptToDelete.trim().isEmpty()) {
+            return -1; // Invalid department code
+        }
+
+        lock.writeLock().lock();
+        try {
+            // Find users to be deleted to update user_roles accordingly
+            Set<String> usersInDept = users.stream()
+                    .filter(u -> u.get("department").equalsIgnoreCase(deptToDelete))
+                    .map(u -> u.get("userName"))
+                    .collect(Collectors.toSet());
+
+            // Remove users, roles, and user-role mappings
+            boolean usersRemoved = users.removeIf(u -> u.get("department").equalsIgnoreCase(deptToDelete));
+            boolean rolesRemoved = roles.removeIf(r -> r.get("department").equalsIgnoreCase(deptToDelete));
+            boolean userRolesRemoved = userRoles.removeIf(ur -> usersInDept.contains(ur.get("userName")));
+
+            if (usersRemoved || rolesRemoved || userRolesRemoved) {
+                boolean usersWritten = writeCsvFile(users, CsvAuthenticationImpl.usersFilePath);
+                boolean rolesWritten = writeCsvFile(roles, CsvAuthenticationImpl.rolesFilePath);
+                boolean userRolesWritten = writeCsvFile(userRoles, CsvAuthenticationImpl.userRolesFilePath);
+                return (usersWritten && rolesWritten && userRolesWritten) ? 1 : -1;
+            }
+            return 1; // No department found to delete, considered success
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public int deleteUserById(String userName, String deptCode) {
+        lock.writeLock().lock();
+        try {
+            boolean userRemoved = users.removeIf(u -> u.get("userName").equalsIgnoreCase(userName) && u.get("department").equalsIgnoreCase(deptCode));
+            boolean userRolesRemoved = userRoles.removeIf(ur -> ur.get("userName").equalsIgnoreCase(userName));
+
+            if (userRemoved) {
+                boolean usersWritten = writeCsvFile(users, CsvAuthenticationImpl.usersFilePath);
+                boolean userRolesWritten = writeCsvFile(userRoles, CsvAuthenticationImpl.userRolesFilePath);
+                return (usersWritten && userRolesWritten) ? 1 : -1;
+            }
+            return -1;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public int deleteRoleById(String roleName, String deptCode) {
+        lock.writeLock().lock();
+        try {
+            boolean roleRemoved = roles.removeIf(r -> r.get("name").equalsIgnoreCase(roleName) && r.get("department").equalsIgnoreCase(deptCode));
+            boolean userRolesRemoved = userRoles.removeIf(ur -> ur.get("roleName").equalsIgnoreCase(roleName));
+
+            if (roleRemoved) {
+                boolean rolesWritten = writeCsvFile(roles, CsvAuthenticationImpl.rolesFilePath);
+                boolean userRolesWritten = writeCsvFile(userRoles, CsvAuthenticationImpl.userRolesFilePath);
+                return (rolesWritten && userRolesWritten) ? 1 : -1;
+            }
+            return -1;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public int updateRolesForUser(Map<String, Object> userRoleData, String updatedBy, String deptCode, String traceid) {
+        String userName = (String) userRoleData.get("userName");
+        List<String> newRoles = (List<String>) userRoleData.get("roles");
+
+        if (userName == null || newRoles == null) {
+            return -1;
+        }
+
+        lock.writeLock().lock();
+        try {
+            userRoles.removeIf(ur -> ur.get("userName").equalsIgnoreCase(userName));
+
+            int maxId = userRoles.stream().mapToInt(ur -> Integer.parseInt(ur.get("id"))).max().orElse(0);
+            for (String roleName : newRoles) {
+                Map<String, String> newMapping = new HashMap<>();
+                newMapping.put("id", String.valueOf(++maxId));
+                newMapping.put("userName", userName);
+                newMapping.put("roleName", roleName);
+                userRoles.add(newMapping);
+            }
+
+            if (writeCsvFile(userRoles, CsvAuthenticationImpl.userRolesFilePath)) {
+                return 1;
+            } else {
+                return -1;
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public int updateUsersForRole(Map<String, Object> userRoleData, String updatedBy, String deptCode, String traceid) {
+        String roleName = (String) userRoleData.get("roleName");
+        List<String> newUsers = (List<String>) userRoleData.get("users");
+
+        if (roleName == null || newUsers == null) {
+            return -1;
+        }
+
+        lock.writeLock().lock();
+        try {
+            userRoles.removeIf(ur -> ur.get("roleName").equalsIgnoreCase(roleName));
+
+            int maxId = userRoles.stream().mapToInt(ur -> Integer.parseInt(ur.get("id"))).max().orElse(0);
+            for (String userName : newUsers) {
+                Map<String, String> newMapping = new HashMap<>();
+                newMapping.put("id", String.valueOf(++maxId));
+                newMapping.put("userName", userName);
+                newMapping.put("roleName", roleName);
+                userRoles.add(newMapping);
+            }
+
+            if (writeCsvFile(userRoles, CsvAuthenticationImpl.userRolesFilePath)) {
+                return 1;
+            } else {
+                return -1;
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public boolean deptExists(String deptCode, String traceid) {
+        lock.readLock().lock();
+        try {
+            if (users == null) return false;
+            return users.stream().anyMatch(u -> u.get("department").equalsIgnoreCase(deptCode));
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    @Override public String generateEmbedToken(Map<String, Object> data, String deptCode, String traceid) {
+        return "dummy-token";
+    }
 }

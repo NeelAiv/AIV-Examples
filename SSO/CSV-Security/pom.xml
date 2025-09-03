@@ -42,13 +42,22 @@
             <scope>test</scope>
         </dependency>
 
+<!--        <dependency>-->
+<!--            <groupId>com.aivhub</groupId>-->
+<!--            <artifactId>security-core</artifactId>-->
+<!--            <version>1.0.0</version>-->
+<!--            <scope>system</scope>-->
+<!--            <systemPath>${project.basedir}/lib/security-core-1.0.0.jar</systemPath>-->
+<!--        </dependency>-->
+
         <dependency>
             <groupId>com.aivhub</groupId>
-            <artifactId>security-core</artifactId>
-            <version>1.0.0</version>
+            <artifactId>authentication</artifactId>
+            <version>1.0-SNAPSHOT-2</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/lib/security-core-1.0.0.jar</systemPath>
+            <systemPath>${project.basedir}/lib/authentication-1.0-SNAPSHOT 2.jar</systemPath>
         </dependency>
+
         <dependency>
             <groupId>com.aivhub</groupId>
             <artifactId>common</artifactId>
@@ -103,14 +112,5 @@
 
 
     </dependencies>
-
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-		</plugins>
-	</build>
 
 </project>
