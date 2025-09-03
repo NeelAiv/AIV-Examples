@@ -3,19 +3,20 @@ package com.example.CSV.Security.security;
 import com.aivhub.logs.AuditLoggerUtil;
 import com.aivhub.security.IAuthentication;
 import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
 import com.opencsv.exceptions.CsvException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
@@ -448,18 +449,340 @@ public class CsvAuthenticationImpl implements IAuthentication {
         }
     }
 
-    @Override public void setSource(DataSource dataSource, String deptCode, String traceid) { this.deptCode = deptCode; this.traceid = traceid; }
-    @Override public int changePassword(Map<String, Object> user, String deptCode, String traceid) { return -1; }
-    @Override public List<Map<String, Object>> selectUsersOfRole(String role, String deptCode) { return new ArrayList<>(); }
-    @Override public List<Map<String, Object>> selectRolesOfUser(String user, String deptCode) { return new ArrayList<>(); }
-    @Override public boolean isRoleExists(String name, String deptCode) { if (roles == null) return false; return roles.stream().anyMatch(r -> r.get("name").equalsIgnoreCase(name)); }
-    @Override public int CreateEditRole(Map<String, Object> data, String deptCode) { return -1; }
-    @Override public int CreateEditDepartment(Map<String, Object> data, String deptCode) { return -1; }
-    @Override public int deleteDeptById(String owner, Map<String, Object> deptId) { return -1; }
-    @Override public int deleteUserById(String userName, String deptCode) { return -1; }
-    @Override public int deleteRoleById(String roleName, String deptCode) { return -1; }
-    @Override public int updateRolesForUser(Map<String, Object> userRoleData, String updatedBy, String deptCode, String traceid) { return -1; }
-    @Override public int updateUsersForRole(Map<String, Object> userRoleData, String updatedBy, String deptCode, String traceid) { return -1; }
-    @Override public boolean deptExists(String deptCode, String traceid) { return true; }
+    @Override
+    public void setSource(DataSource dataSource, String deptCode, String traceid) {
+        this.deptCode = deptCode;
+        this.traceid = traceid;
+    }
+
+    @Override
+    public int changePassword(Map<String, Object> user, String deptCode, String traceid) {
+        String userName = (String) user.get("userName");
+        String oldPassword = (String) user.get("oldPassword");
+        String newPassword = (String) user.get("newPassword");
+
+        lock.writeLock().lock();
+        try {
+            Optional<Map<String, String>> userToUpdate = users.stream()
+                    .filter(u -> u.get("userName").equalsIgnoreCase(userName) && u.get("department").equalsIgnoreCase(deptCode))
+                    .findFirst();
+
+            if (userToUpdate.isPresent()) {
+                Map<String, String> foundUser = userToUpdate.get();
+                if (foundUser.get("password").equals(oldPassword)) {
+                    foundUser.put("password", newPassword);
+                    if (writeCsvFile(users, usersFilePath)) {
+                        return 1;
+                    } else {
+                        return -1;
+                    }
+                } else {
+                    return -2;
+                }
+            }
+            return -3;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public List<Map<String, Object>> selectUsersOfRole(String roleName, String deptCode) {
+        lock.readLock().lock();
+        try {
+            if (userRoles == null || users == null) {
+                return Collections.emptyList();
+            }
+
+            Set<String> userNamesInRole = userRoles.stream()
+                    .filter(ur -> ur.get("roleName").equalsIgnoreCase(roleName))
+                    .map(ur -> ur.get("userName"))
+                    .collect(Collectors.toSet());
+
+            if (userNamesInRole.isEmpty()) return new ArrayList<>();
+
+            return users.stream()
+                    .filter(u -> userNamesInRole.contains(u.get("userName")) && u.get("department").equalsIgnoreCase(deptCode))
+                    .map(u -> new HashMap<String, Object>(u))
+                    .collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    @Override
+    public List<Map<String, Object>> selectRolesOfUser(String userName, String deptCode) {
+        lock.readLock().lock();
+        try {
+            if (userRoles == null || roles == null) {
+                return Collections.emptyList();
+            }
+
+            Set<String> roleNamesForUser = userRoles.stream()
+                    .filter(ur -> ur.get("userName").equalsIgnoreCase(userName))
+                    .map(ur -> ur.get("roleName"))
+                    .collect(Collectors.toSet());
+
+            if (roleNamesForUser.isEmpty()) return new ArrayList<>();
+
+            return roles.stream()
+                    .filter(r -> roleNamesForUser.contains(r.get("name")) && r.get("department").equalsIgnoreCase(deptCode))
+                    .map(r -> new HashMap<String, Object>(r))
+                    .collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    @Override
+    public boolean isRoleExists(String name, String deptCode) {
+        if (roles == null) return false;
+        lock.readLock().lock();
+        try {
+            return roles.stream().anyMatch(r -> r.get("name").equalsIgnoreCase(name) && r.get("department").equalsIgnoreCase(deptCode));
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    @Override
+    public int CreateEditRole(Map<String, Object> data, String deptCode) {
+        String roleName = (String) data.get("name");
+        if (roleName == null || roleName.trim().isEmpty()) {
+            return -1;
+        }
+
+        lock.writeLock().lock();
+        try {
+            Optional<Map<String, String>> existingRole = roles.stream()
+                    .filter(r -> r.get("name").equalsIgnoreCase(roleName) && r.get("department").equalsIgnoreCase(deptCode))
+                    .findFirst();
+
+            if (existingRole.isPresent()) {
+                Map<String, String> roleToUpdate = existingRole.get();
+                data.forEach((key, value) -> roleToUpdate.put(key, String.valueOf(value)));
+            } else {
+                Map<String, String> newRole = new HashMap<>();
+                data.forEach((key, value) -> newRole.put(key, String.valueOf(value)));
+                newRole.putIfAbsent("department", deptCode);
+                roles.add(newRole);
+            }
+
+            if (writeCsvFile(roles, rolesFilePath)) {
+                return 1;
+            } else {
+                return -1;
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public int CreateEditDepartment(Map<String, Object> data, String deptCode) {
+        String oldDeptCode = (String) data.get("oldDeptCode");
+        String newDeptCode = (String) data.get("newDeptCode");
+
+        if (oldDeptCode == null || newDeptCode == null || oldDeptCode.trim().isEmpty() || newDeptCode.trim().isEmpty()) {
+            return -1;
+        }
+
+        lock.writeLock().lock();
+        try {
+            AtomicBoolean changed = new AtomicBoolean(false);
+
+            users.stream()
+                    .filter(u -> u.get("department").equalsIgnoreCase(oldDeptCode))
+                    .forEach(u -> {
+                        u.put("department", newDeptCode);
+                        changed.set(true);
+                    });
+
+            roles.stream()
+                    .filter(r -> r.get("department").equalsIgnoreCase(oldDeptCode))
+                    .forEach(r -> {
+                        r.put("department", newDeptCode);
+                        changed.set(true);
+                    });
+
+            if (changed.get()) {
+                boolean usersWritten = writeCsvFile(users, usersFilePath);
+                boolean rolesWritten = writeCsvFile(roles, rolesFilePath);
+                return (usersWritten && rolesWritten) ? 1 : -1;
+            }
+            return 1;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public int deleteDeptById(String owner, Map<String, Object> deptId) {
+        String deptToDelete = (String) deptId.get("deptCode");
+        if (deptToDelete == null || deptToDelete.trim().isEmpty()) {
+            return -1;
+        }
+
+        lock.writeLock().lock();
+        try {
+            Set<String> usersInDept = users.stream()
+                    .filter(u -> u.get("department").equalsIgnoreCase(deptToDelete))
+                    .map(u -> u.get("userName"))
+                    .collect(Collectors.toSet());
+
+            boolean usersRemoved = users.removeIf(u -> u.get("department").equalsIgnoreCase(deptToDelete));
+            boolean rolesRemoved = roles.removeIf(r -> r.get("department").equalsIgnoreCase(deptToDelete));
+            boolean userRolesRemoved = userRoles.removeIf(ur -> usersInDept.contains(ur.get("userName")));
+
+            if (usersRemoved || rolesRemoved || userRolesRemoved) {
+                boolean usersWritten = writeCsvFile(users, usersFilePath);
+                boolean rolesWritten = writeCsvFile(roles, rolesFilePath);
+                boolean userRolesWritten = writeCsvFile(userRoles, userRolesFilePath);
+                return (usersWritten && rolesWritten && userRolesWritten) ? 1 : -1;
+            }
+            return 1;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public int deleteUserById(String userName, String deptCode) {
+        lock.writeLock().lock();
+        try {
+            boolean userRemoved = users.removeIf(u -> u.get("userName").equalsIgnoreCase(userName) && u.get("department").equalsIgnoreCase(deptCode));
+            boolean userRolesRemoved = userRoles.removeIf(ur -> ur.get("userName").equalsIgnoreCase(userName));
+
+            if (userRemoved) {
+                boolean usersWritten = writeCsvFile(users, usersFilePath);
+                boolean userRolesWritten = writeCsvFile(userRoles, userRolesFilePath);
+                return (usersWritten && userRolesWritten) ? 1 : -1;
+            }
+            return -1;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public int deleteRoleById(String roleName, String deptCode) {
+        lock.writeLock().lock();
+        try {
+            boolean roleRemoved = roles.removeIf(r -> r.get("name").equalsIgnoreCase(roleName) && r.get("department").equalsIgnoreCase(deptCode));
+            boolean userRolesRemoved = userRoles.removeIf(ur -> ur.get("roleName").equalsIgnoreCase(roleName));
+
+            if (roleRemoved) {
+                boolean rolesWritten = writeCsvFile(roles, rolesFilePath);
+                boolean userRolesWritten = writeCsvFile(userRoles, userRolesFilePath);
+                return (rolesWritten && userRolesWritten) ? 1 : -1;
+            }
+            return -1;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public int updateRolesForUser(Map<String, Object> userRoleData, String updatedBy, String deptCode, String traceid) {
+        String userName = (String) userRoleData.get("userName");
+        List<String> newRoles = (List<String>) userRoleData.get("roles");
+
+        if (userName == null || newRoles == null) {
+            return -1;
+        }
+
+        lock.writeLock().lock();
+        try {
+            userRoles.removeIf(ur -> ur.get("userName").equalsIgnoreCase(userName));
+
+            int maxId = userRoles.stream().mapToInt(ur -> Integer.parseInt(ur.get("id"))).max().orElse(0);
+            for (String roleName : newRoles) {
+                Map<String, String> newMapping = new HashMap<>();
+                newMapping.put("id", String.valueOf(++maxId));
+                newMapping.put("userName", userName);
+                newMapping.put("roleName", roleName);
+                userRoles.add(newMapping);
+            }
+
+            if (writeCsvFile(userRoles, userRolesFilePath)) {
+                return 1;
+            } else {
+                return -1;
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public int updateUsersForRole(Map<String, Object> userRoleData, String updatedBy, String deptCode, String traceid) {
+        String roleName = (String) userRoleData.get("roleName");
+        List<String> newUsers = (List<String>) userRoleData.get("users");
+
+        if (roleName == null || newUsers == null) {
+            return -1; // Invalid data
+        }
+
+        lock.writeLock().lock();
+        try {
+            userRoles.removeIf(ur -> ur.get("roleName").equalsIgnoreCase(roleName));
+
+            int maxId = userRoles.stream().mapToInt(ur -> Integer.parseInt(ur.get("id"))).max().orElse(0);
+            for (String userName : newUsers) {
+                Map<String, String> newMapping = new HashMap<>();
+                newMapping.put("id", String.valueOf(++maxId));
+                newMapping.put("userName", userName);
+                newMapping.put("roleName", roleName);
+                userRoles.add(newMapping);
+            }
+
+            if (writeCsvFile(userRoles, userRolesFilePath)) {
+                return 1;
+            } else {
+                return -1;
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    public boolean deptExists(String deptCode, String traceid) {
+        lock.readLock().lock();
+        try {
+            if (users == null) return false;
+            return users.stream().anyMatch(u -> u.get("department").equalsIgnoreCase(deptCode));
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    private boolean writeCsvFile(List<Map<String, String>> data, String resourcePath) {
+        if (data.isEmpty()) {
+            return false;
+        }
+        try {
+            Resource resource = resourceLoader.getResource(resourcePath);
+            File file = resource.getFile();
+
+            try (CSVWriter writer = new CSVWriter(new FileWriter(file))) {
+                String[] header = data.get(0).keySet().toArray(new String[0]);
+                writer.writeNext(header);
+
+                for (Map<String, String> row : data) {
+                    String[] values = new String[header.length];
+                    for (int i = 0; i < header.length; i++) {
+                        values[i] = row.get(header[i]);
+                    }
+                    writer.writeNext(values);
+                }
+            }
+            return true;
+        } catch (IOException e) {
+            AuditLoggerUtil.log(AuditLoggerUtil.SECURITYLOGGER, AuditLoggerUtil.ERROR, "CsvAuthenticationImpl", "Failed to write to CSV resource: " + resourcePath, traceid, deptCode, e);
+            return false;
+        }
+    }
+
     @Override public String generateEmbedToken(Map<String, Object> data, String deptCode, String traceid) { return "dummy-token"; }
 }
