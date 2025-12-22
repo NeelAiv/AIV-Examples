@@ -1,9 +1,9 @@
-package com.example.SAMLwOkta.service;
+package com.example.SAMLwOkta;
 
 import com.aivhub.logs.AuditLoggerUtil;
 import com.aivhub.security.HeaderSecurity;
 import com.aivhub.security.IAuthentication;
-import com.example.AIVsaml.service.OktaService;
+import com.example.SAMLwOkta.service.OktaService;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -39,20 +39,17 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
 
     @Autowired
     public void setStaticDependencies(OktaService oktaService, ResourceLoader resourceLoader) {
-        System.out.println("Spring is injecting dependencies into static fields.");
         SamlAuthenticationImpl2.staticOktaService = oktaService;
         SamlAuthenticationImpl2.staticResourceLoader = resourceLoader;
     }
 
     @PostConstruct
     private void init() {
-        System.out.println("Spring @PostConstruct: The singleton bean is created. Static instance is now set.");
         instance = this;
     }
 
     @Override
     public void setApplicationContextAndDatasource(ApplicationContext context) {
-        System.out.println("AIV bridge method called. Configuring static properties.");
 
         if (SamlAuthenticationImpl2.staticOktaService == null) {
             System.err.println("WARN: Spring dependency injection did not run. Fetching beans from AIV context as a fallback.");
@@ -92,7 +89,6 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
         Properties properties = new Properties();
         try (InputStream input = new ClassPathResource("user_default.properties").getInputStream()) {
             properties.load(input);
-            System.out.println("Successfully loaded user_default.properties in constructor.");
         } catch (IOException e) {
             System.err.println("FATAL: Could not load user_default.properties file. User provisioning will fail.");
             e.printStackTrace();
@@ -169,8 +165,8 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
 
     @Override
     public List<Map<String, Object>> getAllUsers(String deptCode, Map<String, Object> data) {
-        System.out.println(">>> METHOD CALLED: getAllUsers");
-        System.out.println("getAllUsers: Fetching all users from Okta and transforming to AIV format.");
+//        System.out.println(">>> METHOD CALLED: getAllUsers");
+//        System.out.println("getAllUsers: Fetching all users from Okta and transforming to AIV format.");
         OktaService service = getOktaService();
         if (service == null) {
             System.err.println("FATAL: oktaService is null in getAllUsers. Injection failed.");
@@ -187,9 +183,9 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
-        System.out.println("Aiv users: " + aivUsers);
+//        System.out.println("Aiv users: " + aivUsers);
 
-        System.out.println("getAllUsers: Successfully transformed " + aivUsers.size() + " users to AIV format.");
+//        System.out.println("getAllUsers: Successfully transformed " + aivUsers.size() + " users to AIV format.");
 
         return aivUsers;
     }
@@ -225,32 +221,32 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
         adminRole.put("notificationOption", "2");
         adminRole.put("requestOption", "2");
 
-        System.out.println("getAllRoles: Returning Administrator role: " + adminRole);
+//        System.out.println("getAllRoles: Returning Administrator role: " + adminRole);
 
         return List.of(adminRole);
     }
 
     @Override
     public List<Map<String, Object>> getAllDepartments(String deptCode, Map<String, Object> data) {
-        System.out.println(">>> METHOD CALLED: getAllDepartments");
+//        System.out.println(">>> METHOD CALLED: getAllDepartments");
         Map<String, Object> defaultDepartment = new HashMap<>();
 
         defaultDepartment.put("deptcode", "Default");
         defaultDepartment.put("deptname", "Default Department");
         defaultDepartment.put("status", "Active");
 
-        System.out.println("getAllDepartments: Returning: " + List.of(defaultDepartment));
+//        System.out.println("getAllDepartments: Returning: " + List.of(defaultDepartment));
 
         return List.of(defaultDepartment);
     }
 
     @Override
     public Map<String, Object> authenticate(Map<String, Object> data) {
-        System.out.println("Executing 'authenticate' method for user: " + data.get("userName"));
-        System.out.println("Got data: " + data);
+//        System.out.println("Executing 'authenticate' method for user: " + data.get("userName"));
+//        System.out.println("Got data: " + data);
 
         String userName = (String) data.get("userName");
-        System.out.println("Found username in authnenticate: " + userName);
+//        System.out.println("Found username in authnenticate: " + userName);
         if (userName == null || userName.trim().isEmpty()) {
             System.err.println("authenticate: userName is required");
             Map<String, Object> errorResponse = new HashMap<>();
@@ -264,16 +260,16 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
             String token = jwtTokenUtil.generateToken(userName, "-1");
             response.put("token", token);
             response.put("auth-token", token);
-            System.out.println("Generated new token for user: " + userName);
+//            System.out.println("Generated new token for user: " + userName);
         } else {
             String existingToken = data.get("token").toString();
             if (jwtTokenUtil.validateToken(existingToken)) {
-                System.out.println("Existing token is valid for user: " + userName);
+//                System.out.println("Existing token is valid for user: " + userName);
             } else {
                 String newToken = jwtTokenUtil.generateToken(userName, "-1");
                 response.put("token", newToken);
                 response.put("auth-token", newToken);
-                System.out.println("Existing token was invalid. Generated new token for user: " + userName);
+//                System.out.println("Existing token was invalid. Generated new token for user: " + userName);
             }
         }
         response.putIfAbsent("status", "success");
@@ -293,8 +289,7 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
             }
         }
 
-        System.out.println("Authentication successful, returning user profile with token to frontend.");
-        System.out.println("Response from authenticate: " + response);
+//        System.out.println("Response from authenticate: " + response);
         return response;
     }
 
@@ -341,8 +336,8 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
 
     @Override
     public boolean isAuthorize(Map<String, Object> headers) {
-        System.out.println("--- [isAuthorize Check START] ---");
-        System.out.println("Headers outside: " + headers);
+//        System.out.println("--- [isAuthorize Check START] ---");
+//        System.out.println("Headers outside: " + headers);
         try {
             headers.forEach((key, value) -> System.out.println("Header: '" + key + "' = '" + value + "'"));
 
@@ -350,11 +345,11 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
 
             if (token == null || token.trim().isEmpty()) {
                 token = (String) headers.get("token");
-                System.out.println("DEBUG: Using fallback token from 'token' field: " + token);
+//                System.out.println("DEBUG: Using fallback token from 'token' field: " + token);
                 return false;
             }
             if (token == null || token.trim().isEmpty()) {
-                System.out.println("DEBUG: No token found in token field 1");
+//                System.out.println("DEBUG: No token found in token field 1");
                 return false;
             }
 
@@ -362,24 +357,23 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
             String deptCode = (String) headers.get("dc");
             String traceId = (String) headers.get("traceid");
 
-            System.out.println("DEBUG: Final JWT token to validate: " + token);
-
-            System.out.println("DEBUG: Token length: " + (token != null ? token.length() : "null"));
+//            System.out.println("DEBUG: Final JWT token to validate: " + token);
+//            System.out.println("DEBUG: Token length: " + (token != null ? token.length() : "null"));
 
             if (token == null || token.trim().isEmpty()) {
-                System.err.println("No token found in token field 2");
-                System.out.println("--- [isAuthorize Check END] ---");
+//                System.err.println("No token found in token field 2");
+//                System.out.println("--- [isAuthorize Check END] ---");
                 return false;
             }
 
-            System.out.println("Token found for validation: " + token);
+//            System.out.println("Token found for validation: " + token);
             boolean isAuthenicated = isAuthneticated(token, traceId, deptCode);
-            System.out.println("DEBUG: isAuthenticated result: " + isAuthenicated);
+//            System.out.println("DEBUG: isAuthenticated result: " + isAuthenicated);
 
             return isAuthenicated;
 
         } catch (Exception e) {
-            System.out.println("DEBUG: Exception in isAuthorize: " + e.getMessage());
+//            System.out.println("DEBUG: Exception in isAuthorize: " + e.getMessage());
             e.printStackTrace();
             AuditLoggerUtil.log(AuditLoggerUtil.DBLOGGER, AuditLoggerUtil.ERROR,
                     SamlAuthenticationImpl2.class, e.getMessage(), "AUTHENTICATION",
@@ -391,7 +385,7 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
     public static Boolean isAuthneticated(String token,String deptCode,String traceid) {
         try {
 
-            System.out.println("In in Authenticated..........");
+//            System.out.println("In in Authenticated..........");
             return new JwtTokenUtil().validateToken(token);
         } catch (Exception e) {
             AuditLoggerUtil.log(AuditLoggerUtil.SECURITYLOGGER, AuditLoggerUtil.ERROR, SamlAuthenticationImpl2.class, e.getMessage(),
@@ -407,7 +401,7 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
 
     @Override
     public List<Map<String, Object>> selectUsersOfRole(String role, String department) {
-        System.out.println(">>> METHOD CALLED: selectUsersOfRole for role: " + role);
+//        System.out.println(">>> METHOD CALLED: selectUsersOfRole for role: " + role);
         OktaService service = getOktaService();
         if (service == null) {
             System.err.println("selectUsersOfRole: OktaService not available");
@@ -415,7 +409,7 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
         }
 
         List<Map<String, Object>> allUsers = service.getAllUsers();
-        System.out.println("selectUsersOfRole: Returning " + allUsers.size() + " users for role: " + role);
+//        System.out.println("selectUsersOfRole: Returning " + allUsers.size() + " users for role: " + role);
         return allUsers;
     }
 
@@ -426,24 +420,24 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
         defaultRole.put("roleDescription", "Default SAML Administrator Role");
         defaultRole.put("department", department != null ? department : "Default");
 
-        System.out.println("selectRolesOfUser: Returning default role for user: " + username);
-        System.out.println("Select roles of users: " + defaultRole);
+//        System.out.println("selectRolesOfUser: Returning default role for user: " + username);
+//        System.out.println("Select roles of users: " + defaultRole);
         return List.of(defaultRole);
     }
 
     @Override
     public boolean isRoleExists(String name, String deptCode) {
-        System.out.println(">>> METHOD CALLED: isRoleExists for role: " + name);
+//        System.out.println(">>> METHOD CALLED: isRoleExists for role: " + name);
         boolean exists = "Administrator".equalsIgnoreCase(name)
                 || "Admin".equalsIgnoreCase(name)
                 || "Default".equalsIgnoreCase(name);
-        System.out.println("isRoleExists: " + name + " = " + exists);
+//        System.out.println("isRoleExists: " + name + " = " + exists);
         return exists;
     }
 
     @Override
     public boolean isUserExists(String username, String deptCode) {
-        System.out.println(">>> METHOD CALLED: isUserExists for user: " + username);
+//        System.out.println(">>> METHOD CALLED: isUserExists for user: " + username);
         OktaService service = getOktaService();
         if (service == null) {
             System.err.println("isUserExists: OktaService not available");
@@ -452,26 +446,25 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
 
         Map<String, Object> user = service.getUserByName(username);
         boolean exists = user != null;
-        System.out.println("isUserExists: " + username + " = " + exists);
+//        System.out.println("isUserExists: " + username + " = " + exists);
         return exists;
     }
 
     @Override
     public Map<String, Object> getUserByName(String userName, String deptCode, Map<String, Object> data) {
-        System.out.println(">>> METHOD CALLED: getUserByName for: " + userName);
+//        System.out.println(">>> METHOD CALLED: getUserByName for: " + userName);
         
         OktaService service = getOktaService();
         Map<String, Object> oktaUser = null;
         if (service != null) {
             oktaUser = service.getUserByName(userName);
-            System.out.println("User by Name in oktaUser: " + oktaUser);
+//            System.out.println("User by Name in oktaUser: " + oktaUser);
         }
 
         if (oktaUser != null && oktaUser.containsKey("profile")) {
             return buildFullAivUserProfile(oktaUser);
         }
 
-        System.out.println("WARN: Okta API unavailable or user not found. Building default profile for: " + userName);
         return buildDefaultUserProfile(userName, deptCode != null ? deptCode : "Default");
     }
 
@@ -555,10 +548,10 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
 
     @Override
     public Map<String, Object> getRoleByName(String roleName, String deptCode, Map<String, Object> data) {
-        System.out.println(">>> METHOD CALLED: getRoleByName for role: " + roleName);
+//        System.out.println(">>> METHOD CALLED: getRoleByName for role: " + roleName);
 
         if (!"Admin".equalsIgnoreCase(roleName) && !"Administrator".equalsIgnoreCase(roleName)) {
-            System.out.println("getRoleByName: Role not found: " + roleName);
+//            System.out.println("getRoleByName: Role not found: " + roleName);
             return Map.of();
         }
 
@@ -587,14 +580,14 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
         role.put("notificationOption", "2");
         role.put("requestOption", "2");
 
-        System.out.println("getRoleByName: Returning complete role: " + role);
+//        System.out.println("getRoleByName: Returning complete role: " + role);
         return role;
     }
 
     @Override
     public int CreateEditUser(Map<String, Object> data, String deptCode) {
-        System.out.println(">>> METHOD CALLED: CreateEditUser");
-        System.out.println("Data: " + data);
+//        System.out.println(">>> METHOD CALLED: CreateEditUser");
+//        System.out.println("Data: " + data);
         String username = data.get("userName") != null ? data.get("userName").toString() : null;
 
         if (username == null) {
@@ -602,11 +595,11 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
             return 0;
         }
 
-        System.out.println("CreateEditUser: SAML users are auto-provisioned. Skipping creation for: " + username);
+//        System.out.println("CreateEditUser: SAML users are auto-provisioned. Skipping creation for: " + username);
 
         try {
             new HeaderSecurity().createFilesFolders(username, deptCode, "USER_MANAGEMENT");
-            System.out.println("CreateEditUser: Ensured home folder exists for: " + username);
+//            System.out.println("CreateEditUser: Ensured home folder exists for: " + username);
             return 1;
         } catch (Exception e) {
             System.err.println("CreateEditUser: Failed to create home folder: " + e.getMessage());
@@ -617,8 +610,8 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
 
     @Override
     public int CreateEditRole(Map<String, Object> data, String deptCode) {
-        System.out.println(">>> METHOD CALLED: CreateEditRole");
-        System.out.println("Data: " + data);
+//        System.out.println(">>> METHOD CALLED: CreateEditRole");
+//        System.out.println("Data: " + data);
         String roleName = data.get("roleName") != null ? data.get("roleName").toString() : null;
 
         if (roleName == null) {
@@ -627,19 +620,17 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
         }
 
         if ("Administrator".equalsIgnoreCase(roleName)) {
-            System.out.println("CreateEditRole: Allowing Administrator role creation for SAML");
+//            System.out.println("CreateEditRole: Allowing Administrator role creation for SAML");
             return 1;
         }
 
-
-        System.out.println("CreateEditRole: Roles should be managed in Okta. Cannot create role: " + roleName);
         return 0;
     }
 
     @Override
     public int CreateEditDepartment(Map<String, Object> data, String deptCode) {
-        System.out.println(">>> METHOD CALLED: CreateEditDepartment");
-        System.out.println("Data: " + data);
+//        System.out.println(">>> METHOD CALLED: CreateEditDepartment");
+//        System.out.println("Data: " + data);
         String departmentName = data.get("deptCode") != null ? data.get("deptCode").toString() : null;
 
         if (departmentName == null) {
@@ -647,7 +638,7 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
             return 0;
         }
 
-        System.out.println("CreateEditDepartment: Departments are predefined in SAML setup: " + departmentName);
+//        System.out.println("CreateEditDepartment: Departments are predefined in SAML setup: " + departmentName);
         return 0;
     }
 
@@ -659,7 +650,6 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
         defaultDept.put("admin", owner);
         defaultDept.put("status", "Active");
 
-        System.out.println("getAlldepartmentsWithAdmin: Returning default department");
         return List.of(defaultDept);
     }
 
@@ -680,9 +670,7 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
 
     @Override
     public Map<String, Object> getUserRoleFeatures(String userName, String deptCode) {
-        System.out.println("=================================================================");
-        System.out.println(">>> METHOD CALLED: getUserRoleFeatures for: " + userName + " in dept: " + deptCode);
-        System.out.println("=================================================================");
+//        System.out.println(">>> METHOD CALLED: getUserRoleFeatures for: " + userName + " in dept: " + deptCode);
 
         OktaService service = getOktaService();
         if (service == null) {
@@ -738,30 +726,29 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
         finalFeatures.put("notificationOption", "2");
         finalFeatures.put("requestOption", "2");
 
-        System.out.println("getUserRoleFeatures: Returning complete features: " + finalFeatures);
-        System.out.println("=================================================================");
+//        System.out.println("getUserRoleFeatures: Returning complete features: " + finalFeatures);
 
         return finalFeatures;
     }
 
     @Override
     public int updateRolesForUser(Map<String, Object> userRoleData, String updatedBy, String deptCode, String traceid) {
-        System.out.println(">>> METHOD CALLED: updateRolesForUser");
-        System.out.println("userRoleData: " + userRoleData);
-        System.out.println("updatedBy: " + updatedBy);
-
-        System.out.println("updateRolesForUser: Roles are managed in Okta. Returning success.");
+//        System.out.println(">>> METHOD CALLED: updateRolesForUser");
+//        System.out.println("userRoleData: " + userRoleData);
+//        System.out.println("updatedBy: " + updatedBy);
+//
+//        System.out.println("updateRolesForUser: Roles are managed in Okta. Returning success.");
 
         return 1;
     }
 
     @Override
     public int updateUsersForRole(Map<String, Object> userRoleData, String updatedBy, String deptCode, String traceid) {
-        System.out.println(">>> METHOD CALLED: updateUsersForRole");
-        System.out.println("userRoleData: " + userRoleData);
-        System.out.println("updatedBy: " + updatedBy);
-
-        System.out.println("updateUsersForRole: User-role assignments are managed in Okta. Returning success.");
+//        System.out.println(">>> METHOD CALLED: updateUsersForRole");
+//        System.out.println("userRoleData: " + userRoleData);
+//        System.out.println("updatedBy: " + updatedBy);
+//
+//        System.out.println("updateUsersForRole: User-role assignments are managed in Okta. Returning success.");
 
         return 1;
     }
@@ -769,13 +756,13 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
     @Override
     public boolean deptExists(String deptCode, String traceid) {
         boolean exists = "Default".equalsIgnoreCase(deptCode);
-        System.out.println("deptExists: " + deptCode + " = " + exists);
+//        System.out.println("deptExists: " + deptCode + " = " + exists);
         return exists;
     }
 
     @Override
     public Map<String, Object> getAuthAfterTimeUser(String userName, String dc, String traceid) {
-        System.out.println("Building COMPLETE and RELIABLE profile defaults for: " + userName);
+//        System.out.println("Building COMPLETE and RELIABLE profile defaults for: " + userName);
 
         Map<String, Object> userProfile = new HashMap<>();
 
@@ -826,7 +813,7 @@ public class SamlAuthenticationImpl2 implements IAuthentication {
             }
         }
 
-        System.out.println("Final, complete User Profile: " + userProfile);
+//        System.out.println("Final, complete User Profile: " + userProfile);
         return userProfile;
     }
 

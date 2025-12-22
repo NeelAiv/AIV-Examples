@@ -1,4 +1,4 @@
-package com.example.SAMLwOkta.service;
+package com.example.SAMLwOkta;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

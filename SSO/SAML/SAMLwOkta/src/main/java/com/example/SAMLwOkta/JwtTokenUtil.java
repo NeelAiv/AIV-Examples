@@ -1,4 +1,4 @@
-package com.example.SAMLwOkta.service;
+package com.example.SAMLwOkta;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;

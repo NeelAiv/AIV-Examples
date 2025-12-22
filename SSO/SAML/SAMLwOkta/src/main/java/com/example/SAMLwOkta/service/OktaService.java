@@ -1,13 +1,13 @@
-package com.example.AIVsaml.service;
+package com.example.SAMLwOkta.service;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.http.HttpEntity;
 
 import java.util.List;
 import java.util.Map;
@@ -43,8 +43,6 @@ public class OktaService {
                 url, HttpMethod.GET, createHttpEntity(), typeRef);
             return response.getBody() != null ? response.getBody() : List.of();
         } catch (Exception e) {
-            // Handle API errors gracefully (invalid token, network issues, etc.)
-            // Log the error but don't throw - return empty list instead
             System.err.println("WARN: Failed to fetch users from Okta API: " + e.getMessage());
             return List.of();
         }
@@ -59,7 +57,6 @@ public class OktaService {
                 url, HttpMethod.GET, createHttpEntity(), typeRef);
             return response.getBody();
         } catch (Exception e) {
-            // Handle user not found and other exceptions
             return null;
         }
     }

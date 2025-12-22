@@ -1,4 +1,4 @@
-package com.example.SAMLwOkta.service;
+package com.example.SAMLwOkta;
 
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;

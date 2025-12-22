@@ -1,21 +1,18 @@
-package com.example.AIVsaml.config;
+package com.example.SAMLwOkta.config;
 
 //import com.example.AIVsaml.SamlAuthenticationSuccessHandler;
-import com.example.AIVsaml.SamlAuthenticationSuccessHandler2;
-import com.example.AIVsaml.SamlInitiationFilter;
-import jakarta.servlet.http.HttpServletResponse;
+
+
+import com.example.SAMLwOkta.SamlAuthenticationSuccessHandler2;
+import com.example.SAMLwOkta.SamlInitiationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
-import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
-import org.springframework.web.client.RestTemplate;
-
 
 import static org.springframework.security.config.Customizer.withDefaults;
 

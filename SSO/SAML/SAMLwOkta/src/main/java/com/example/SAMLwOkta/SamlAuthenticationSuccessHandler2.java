@@ -1,4 +1,4 @@
-package com.example.SAMLwOkta.service;
+package com.example.SAMLwOkta;
 
 import com.aivhub.security.HeaderSecurity;
 import com.aivhub.security.IAuthentication;
@@ -57,7 +57,7 @@ public class SamlAuthenticationSuccessHandler2 implements AuthenticationSuccessH
         attributeMappings.put("email", emailAttribute);
         attributeMappings.put("department", departmentAttribute);
 
-        System.out.println("Attribute mappings: " + attributeMappings);
+//        System.out.println("Attribute mappings: " + attributeMappings);
 
         String department = "Default";
         String aivUsername = getFirstAttribute(principal, attributeMappings.get("username"), null);
@@ -68,7 +68,7 @@ public class SamlAuthenticationSuccessHandler2 implements AuthenticationSuccessH
             return;
         }
 
-        System.out.println("SAML login successful for user: " + aivUsername);
+//        System.out.println("SAML login successful for user: " + aivUsername);
 
         try {
             new HeaderSecurity().createFilesFolders(aivUsername, department, "SAML_PROVISIONING");
@@ -83,19 +83,19 @@ public class SamlAuthenticationSuccessHandler2 implements AuthenticationSuccessH
         credentials.put("lastName", getFirstAttribute(principal, attributeMappings.get("lastName"), ""));
         credentials.put("email", getFirstAttribute(principal, attributeMappings.get("email"), ""));
         credentials.put("department", department);
-        System.out.println("User Details/credentials in buildAivUserFromSaml: " + credentials);
+//        System.out.println("User Details/credentials in buildAivUserFromSaml: " + credentials);
 
         Map<String, Object> userDetails = authentication.authenticate(credentials);
 
-        System.out.println("User Details here: " + userDetails);
+//        System.out.println("User Details here: " + userDetails);
 
         if (userDetails != null && userDetails.containsKey("token")){
-            System.out.println("Authentication successful for user: " + aivUsername);
+//            System.out.println("Authentication successful for user: " + aivUsername);
 
             String canonicalUsername = userDetails.get("userName").toString();
             String deptCode = userDetails.get("deptCode").toString();
-            System.out.println("can user name: " + canonicalUsername);
-            System.out.println("deptCode after can user name: " + deptCode);
+//            System.out.println("can user name: " + canonicalUsername);
+//            System.out.println("deptCode after can user name: " + deptCode);
 
             String token = userDetails.get("token").toString();
 
@@ -108,11 +108,11 @@ public class SamlAuthenticationSuccessHandler2 implements AuthenticationSuccessH
             ssoPayloadObject.put("deptCode", deptCode);
             ssoPayloadObject.put("dc", deptCode);
 
-            System.out.println("SSO payload here: " + ssoPayloadObject);
+//            System.out.println("SSO payload here: " + ssoPayloadObject);
 
             HeaderSecurity headerSecurity = new HeaderSecurity();
             String finalRedirectUrl = headerSecurity.getSecure(ssoPayloadObject, deptCode, request, null, UUID.randomUUID().toString());
-            System.out.println("Final redirect url here: " + finalRedirectUrl);
+//            System.out.println("Final redirect url here: " + finalRedirectUrl);
             response.sendRedirect(finalRedirectUrl);
 
         } else {

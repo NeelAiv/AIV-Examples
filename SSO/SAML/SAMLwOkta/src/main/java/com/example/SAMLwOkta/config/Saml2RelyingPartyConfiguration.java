@@ -1,4 +1,4 @@
-package com.example.AIVsaml.config;
+package com.example.SAMLwOkta.config;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;

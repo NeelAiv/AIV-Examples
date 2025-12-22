@@ -1,4 +1,4 @@
-package com.example.SAMLwOkta.service;
+package com.example.SAMLwOkta;
 
 import com.aivhub.security.HeaderSecurity;
 import jakarta.servlet.*;
@@ -31,35 +31,35 @@ public class SamlInitiationFilter implements Filter {
             HttpServletResponse res = (HttpServletResponse) response;
             String path = req.getRequestURI();
 
-            System.out.println("Path here: " + path);
+//            System.out.println("Path here: " + path);
 
             String contextPath = req.getContextPath();
             String logoutPath = (contextPath + "/").replaceAll("//", "/");
             String errorPath = contextPath + "/error";
 
             if (path.equals(logoutPath) || path.equals(errorPath)) {
-                System.out.println("SamlInitiationFilter: Ignoring post-logout or error path: " + path);
+//                System.out.println("SamlInitiationFilter: Ignoring post-logout or error path: " + path);
                 chain.doFilter(request, response);
                 return;
             }
 
             if (AIV_ENTRY_PATTERN.matcher(path).matches() && req.getParameter("e") == null
                     && !isFileOperationEndpoint(path)) {
-                System.out.println("SamlInitiationFilter: Intercepted AIV entry point: " + path + ". Redirecting to SAML provider.");
+//                System.out.println("SamlInitiationFilter: Intercepted AIV entry point: " + path + ". Redirecting to SAML provider.");
 
                 String relayState = req.getRequestURL().toString();
                 if (req.getQueryString() != null) {
                     relayState += "?" + req.getQueryString();
                 }
 
-                System.out.println("Relay State: " + relayState);
+//                System.out.println("Relay State: " + relayState);
 
                 String samlLoginUrl = UriComponentsBuilder.fromPath(req.getContextPath())
                         .path("/saml2/authenticate/okta")
                         .queryParam("RelayState", relayState)
                         .toUriString();
 
-                System.out.println("Redirecting to SAML IdP with RelayState: " + relayState);
+//                System.out.println("Redirecting to SAML IdP with RelayState: " + relayState);
                 res.sendRedirect(samlLoginUrl);
                 return;
             } try {
@@ -70,7 +70,7 @@ public class SamlInitiationFilter implements Filter {
 
             chain.doFilter(request, response);
         } catch (Exception e){
-            System.out.println("Failed in do Filter due to " + e.getMessage());
+//            System.out.println("Failed in do Filter due to " + e.getMessage());
         }
 
     }
@@ -84,13 +84,13 @@ public class SamlInitiationFilter implements Filter {
             String authHeader = req.getHeader("Authorization");
             if (authHeader != null && authHeader.toLowerCase().startsWith("bearer ")) {
                 oldToken = authHeader.substring(7);
-                System.out.println("Filter found token in 'Authorization' header.");
+//                System.out.println("Filter found token in 'Authorization' header.");
             }
 
             if (oldToken == null) {
                 oldToken = req.getHeader("token");
                 if (oldToken != null) {
-                    System.out.println("Filter found token in custom 'token' header.");
+//                    System.out.println("Filter found token in custom 'token' header.");
                 }
             }
 
@@ -102,7 +102,7 @@ public class SamlInitiationFilter implements Filter {
 
                         String extendedToken = jwtTokenUtil.extendTokenExpiration(oldToken, sessionTimeInSeconds);
                         res.addHeader("auth-token", extendedToken);
-                        System.out.println("SUCCESS: SAML Filter extended token for API call: " + uri);
+//                        System.out.println("SUCCESS: SAML Filter extended token for API call: " + uri);
                     } else {
                         System.out.println("DEBUG: Another filter may have already handled token extension. SAML filter is standing down.");
                     }
