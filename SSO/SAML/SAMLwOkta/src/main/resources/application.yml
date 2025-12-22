@@ -1,0 +1,45 @@
+server:
+  port: 9222
+  servlet:
+    context-path: /aiv-sso
+
+#aiv:
+#  redirect:
+#    url: http://localhost:8080/aiv/{deptCode}/sso_login?e={payload}
+
+okta:
+  api:
+    token: 006oAIjKXlTwgP9Qg96Nq944_xf9vKEw99j96GyQEE
+    domain: integrator-1581101.okta.com
+
+aiv:
+  sso:
+    test-redirect-base-url: "http://localhost:8080/aiv"
+    post-logout-redirect-uri: "http://localhost:8080/aiv/"
+
+saml:
+  attribute:
+    mapping:
+      userName: "username"
+      firstname: "firstName"
+      lastname: "lastName"
+      email: "email"
+      # Optional
+      department: "department"
+
+spring:
+  security:
+    saml2:
+      relyingparty:
+        registration:
+          okta:
+            entity-id: aiv-saml-sp
+            signing:
+              credentials:
+                - private-key-location: "classpath:sp-private-key.pem"
+                  certificate-location: "classpath:sp-certificate.pem"
+#                  alias: "okta"
+#                  password: "store123"
+#                  keystore-type: "JKS"
+            assertingparty:
+              metadata-uri: "https://integrator-1581101.okta.com/app/exkvgzurh6B0rVra1697/sso/saml/metadata"
